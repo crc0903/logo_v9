@@ -52,17 +52,28 @@ def create_logo_slide(prs, logos, canvas_width_in, canvas_height_in, logos_per_r
         col = idx % cols
         row = idx // cols
         trimmed = trim_whitespace(logo)
-        resized, box_width, box_height = resize_to_fill_5x2_box(trimmed, int(cell_width), int(cell_height))
+        img_w, img_h = trimmed.size
+        
+        # Limit to cell size without resizing unless absolutely necessary
+        scale = min(cell_width / img_w, cell_height / img_h, 1.0)  # Prevent upscaling
+        final_w = img_w * scale
+        final_h = img_h * scale
+        
         img_stream = io.BytesIO()
-        resized.save(img_stream, format="PNG", dpi=(300, 300))  # Key line for clarity
+        trimmed.save(img_stream, format="PNG", dpi=(300, 300))
         img_stream.seek(0)
-        x_offset = (cell_width - box_width) / 2 + (box_width - resized.width) / 2
-        y_offset = (cell_height - box_height) / 2 + (box_height - resized.height) / 2
+        
+        x_offset = (cell_width - final_w) / 2
+        y_offset = (cell_height - final_h) / 2
         left = left_margin + Inches((col * cell_width + x_offset) / 96)
         top = top_margin + Inches((row * cell_height + y_offset) / 96)
-        slide.shapes.add_picture(img_stream, left, top,
-            width=Inches(resized.width / 96),
-            height=Inches(resized.height / 96))
+        
+        slide.shapes.add_picture(
+            img_stream, left, top,
+            width=Inches(final_w / 96),
+            height=Inches(final_h / 96)
+        )
+
 
 # --- Streamlit UI ---
 st.title("Logo Grid PowerPoint Exporter")
