@@ -16,13 +16,10 @@ def trim_whitespace(image):
         return image.crop(bbox)
     return image
 
-def resize_to_fill_5x2_box(image, cell_width_px, cell_height_px, buffer_ratio=0.7):
+def resize_to_fill_5x2_box(image, cell_width_px, cell_height_px, buffer_ratio=0.75):
     box_ratio = 3 / 1
     max_box_width = int(cell_width_px * buffer_ratio)
     max_box_height = int(cell_height_px * buffer_ratio)
-
-    # Dynamically adjust logo scale based on box size
-    logo_scale = 0.92 if max_box_width < 250 else 0.85
 
     if max_box_width / box_ratio <= max_box_height:
         box_width = max_box_width
@@ -31,11 +28,12 @@ def resize_to_fill_5x2_box(image, cell_width_px, cell_height_px, buffer_ratio=0.
         box_height = max_box_height
         box_width = int(max_box_height * box_ratio)
 
-    box_width = int(box_width * logo_scale)
-    box_height = int(box_height * logo_scale)
-
     img_w, img_h = image.size
     img_ratio = img_w / img_h
+
+    if img_w <= box_width and img_h <= box_height:
+        # No need to resize if already fits
+        return image, img_w, img_h
 
     if img_ratio > (box_width / box_height):
         new_width = box_width
@@ -45,7 +43,7 @@ def resize_to_fill_5x2_box(image, cell_width_px, cell_height_px, buffer_ratio=0.
         new_width = int(box_height * img_ratio)
 
     resized = image.resize((new_width, new_height), Image.LANCZOS)
-    return resized, box_width, box_height
+    return resized, new_width, new_height
 
 def create_logo_slide(prs, logos, canvas_width_in, canvas_height_in, logos_per_row):
     slide = prs.slides.add_slide(prs.slide_layouts[6])
@@ -56,40 +54,35 @@ def create_logo_slide(prs, logos, canvas_width_in, canvas_height_in, logos_per_r
     cols = logos_per_row if logos_per_row else max(1, round((logo_count / 1.5) ** 0.5 * (canvas_width_in / canvas_height_in) ** 0.3))
     rows = math.ceil(logo_count / cols)
 
-    # Dynamic padding based on grid size
-    base_padding = 0.85
-    padding_boost = min(0.1, 0.2 / max(cols, rows))
-    padding_ratio = base_padding + padding_boost
+    cell_width = canvas_width_px / cols
+    cell_height = canvas_height_px / rows
 
-    cell_width = (canvas_width_px / cols) * padding_ratio
-    cell_height = (canvas_height_px / rows) * padding_ratio
-
-    left_margin = Inches((10 - canvas_width_in) / 2 + 0.1)
-    top_margin = Inches((7.5 - canvas_height_in) / 2 + 0.1)
+    left_margin = Inches((10 - canvas_width_in) / 2)
+    top_margin = Inches((7.5 - canvas_height_in) / 2)
 
     for idx, logo in enumerate(logos):
         col = idx % cols
         row = idx // cols
 
         trimmed = trim_whitespace(logo)
-        resized, box_w, box_h = resize_to_fill_5x2_box(trimmed, cell_width, cell_height)
+        resized, final_w, final_h = resize_to_fill_5x2_box(trimmed, cell_width, cell_height)
+
+        x_offset = (cell_width - final_w) / 2
+        y_offset = (cell_height - final_h) / 2
+
+        left = left_margin + Inches((col * cell_width + x_offset) / 96)
+        top = top_margin + Inches((row * cell_height + y_offset) / 96)
 
         img_stream = io.BytesIO()
         resized.save(img_stream, format="PNG", dpi=(300, 300))
         img_stream.seek(0)
 
-        x_offset = (cell_width - resized.width) / 2
-        y_offset = (cell_height - resized.height) / 2
-
-        left = left_margin + Inches((col * cell_width + x_offset) / 96)
-        top = top_margin + Inches((row * cell_height + y_offset) / 96)
-
         slide.shapes.add_picture(
             img_stream,
             left,
             top,
-            width=Inches(resized.width / 96),
-            height=Inches(resized.height / 96)
+            width=Inches(final_w / 96),
+            height=Inches(final_h / 96)
         )
 
 # --- Streamlit UI ---
