@@ -16,10 +16,13 @@ def trim_whitespace(image):
         return image.crop(bbox)
     return image
 
-def resize_to_fill_5x2_box(image, cell_width_px, cell_height_px, buffer_ratio=0.7, logo_scale=0.85):
+def resize_to_fill_5x2_box(image, cell_width_px, cell_height_px, buffer_ratio=0.7):
     box_ratio = 3 / 1
     max_box_width = int(cell_width_px * buffer_ratio)
     max_box_height = int(cell_height_px * buffer_ratio)
+
+    # Dynamically adjust logo scale based on box size
+    logo_scale = 0.92 if max_box_width < 250 else 0.85
 
     if max_box_width / box_ratio <= max_box_height:
         box_width = max_box_width
@@ -28,7 +31,6 @@ def resize_to_fill_5x2_box(image, cell_width_px, cell_height_px, buffer_ratio=0.
         box_height = max_box_height
         box_width = int(max_box_height * box_ratio)
 
-    # Shrink the box slightly to introduce spacing between logos
     box_width = int(box_width * logo_scale)
     box_height = int(box_height * logo_scale)
 
@@ -54,38 +56,30 @@ def create_logo_slide(prs, logos, canvas_width_in, canvas_height_in, logos_per_r
     cols = logos_per_row if logos_per_row else max(1, round((logo_count / 1.5) ** 0.5 * (canvas_width_in / canvas_height_in) ** 0.3))
     rows = math.ceil(logo_count / cols)
 
-    # Size of each cell in the grid
-    cell_width = canvas_width_px / cols
-    cell_height = canvas_height_px / rows
+    # Dynamic padding based on grid size
+    base_padding = 0.85
+    padding_boost = min(0.1, 0.2 / max(cols, rows))
+    padding_ratio = base_padding + padding_boost
 
-    # Padding space between logos (in pixels)
-    padding_px = 20
+    cell_width = (canvas_width_px / cols) * padding_ratio
+    cell_height = (canvas_height_px / rows) * padding_ratio
 
-    # Left/top margin to center the grid on the slide
-    left_margin = Inches((10 - canvas_width_in) / 2)
-    top_margin = Inches((7.5 - canvas_height_in) / 2)
+    left_margin = Inches((10 - canvas_width_in) / 2 + 0.1)
+    top_margin = Inches((7.5 - canvas_height_in) / 2 + 0.1)
 
     for idx, logo in enumerate(logos):
         col = idx % cols
         row = idx // cols
 
         trimmed = trim_whitespace(logo)
-        img_w, img_h = trimmed.size
-
-        max_logo_width = cell_width - padding_px
-        max_logo_height = cell_height - padding_px
-
-        # Scale the logo to fit within the cell, respecting aspect ratio
-        scale = min(max_logo_width / img_w, max_logo_height / img_h, 1.0)
-        final_w = img_w * scale
-        final_h = img_h * scale
+        resized, box_w, box_h = resize_to_fill_5x2_box(trimmed, cell_width, cell_height)
 
         img_stream = io.BytesIO()
-        trimmed.save(img_stream, format="PNG", dpi=(300, 300))
+        resized.save(img_stream, format="PNG", dpi=(300, 300))
         img_stream.seek(0)
 
-        x_offset = (cell_width - final_w) / 2
-        y_offset = (cell_height - final_h) / 2
+        x_offset = (cell_width - resized.width) / 2
+        y_offset = (cell_height - resized.height) / 2
 
         left = left_margin + Inches((col * cell_width + x_offset) / 96)
         top = top_margin + Inches((row * cell_height + y_offset) / 96)
@@ -94,8 +88,8 @@ def create_logo_slide(prs, logos, canvas_width_in, canvas_height_in, logos_per_r
             img_stream,
             left,
             top,
-            width=Inches(final_w / 96),
-            height=Inches(final_h / 96)
+            width=Inches(resized.width / 96),
+            height=Inches(resized.height / 96)
         )
 
 # --- Streamlit UI ---
