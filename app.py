@@ -28,6 +28,7 @@ def resize_to_fill_5x2_box(image, cell_width_px, cell_height_px, buffer_ratio=0.
         box_height = max_box_height
         box_width = int(max_box_height * box_ratio)
 
+    # Shrink the box slightly to introduce spacing between logos
     box_width = int(box_width * logo_scale)
     box_height = int(box_height * logo_scale)
 
@@ -42,48 +43,46 @@ def resize_to_fill_5x2_box(image, cell_width_px, cell_height_px, buffer_ratio=0.
         new_width = int(box_height * img_ratio)
 
     resized = image.resize((new_width, new_height), Image.LANCZOS)
-    return resized
+    return resized, box_width, box_height
 
 def create_logo_slide(prs, logos, canvas_width_in, canvas_height_in, logos_per_row):
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     canvas_width_px = int(canvas_width_in * 96)
     canvas_height_px = int(canvas_height_in * 96)
-    
     logo_count = len(logos)
     cols = logos_per_row if logos_per_row else max(1, round((logo_count / 1.5) ** 0.5 * (canvas_width_in / canvas_height_in) ** 0.3))
     rows = math.ceil(logo_count / cols)
-
-    cell_width = canvas_width_px / cols
-    cell_height = canvas_height_px / rows
-
+    padding_ratio = 0.9  # try 0.85 if still too tight
+    cell_width = (canvas_width_px / cols) * padding_ratio
+    cell_height = (canvas_height_px / rows) * padding_ratio
     left_margin = Inches((10 - canvas_width_in) / 2)
     top_margin = Inches((7.5 - canvas_height_in) / 2)
-
     for idx, logo in enumerate(logos):
         col = idx % cols
         row = idx // cols
-
         trimmed = trim_whitespace(logo)
-        resized = resize_to_fill_5x2_box(trimmed, cell_width, cell_height)
-
-        img_w, img_h = resized.size
-        x_offset = (cell_width - img_w) / 2
-        y_offset = (cell_height - img_h) / 2
-
+        img_w, img_h = trimmed.size
+        
+        # Limit to cell size without resizing unless absolutely necessary
+        scale = min(cell_width / img_w, cell_height / img_h, 1.0)  # Prevent upscaling
+        final_w = img_w * scale
+        final_h = img_h * scale
+        
+        img_stream = io.BytesIO()
+        trimmed.save(img_stream, format="PNG", dpi=(300, 300))
+        img_stream.seek(0)
+        
+        x_offset = (cell_width - final_w) / 2
+        y_offset = (cell_height - final_h) / 2
         left = left_margin + Inches((col * cell_width + x_offset) / 96)
         top = top_margin + Inches((row * cell_height + y_offset) / 96)
-
-        img_stream = io.BytesIO()
-        resized.save(img_stream, format="PNG", dpi=(300, 300))
-        img_stream.seek(0)
-
+        
         slide.shapes.add_picture(
-            img_stream,
-            left,
-            top,
-            width=Inches(img_w / 96),
-            height=Inches(img_h / 96)
+            img_stream, left, top,
+            width=Inches(final_w / 96),
+            height=Inches(final_h / 96)
         )
+
 
 # --- Streamlit UI ---
 st.title("Logo Grid PowerPoint Exporter")
@@ -91,7 +90,6 @@ st.markdown("Upload logos or use preloaded ones below:")
 
 if not os.path.exists(PRELOADED_LOGO_DIR):
     os.makedirs(PRELOADED_LOGO_DIR)
-
 preloaded_filenames = sorted([
     os.path.splitext(f)[0] for f in os.listdir(PRELOADED_LOGO_DIR)
     if f.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))
