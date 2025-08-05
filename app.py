@@ -49,48 +49,54 @@ def create_logo_slide(prs, logos, canvas_width_in, canvas_height_in, logos_per_r
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     canvas_width_px = int(canvas_width_in * 96)
     canvas_height_px = int(canvas_height_in * 96)
+    
     logo_count = len(logos)
     cols = logos_per_row if logos_per_row else max(1, round((logo_count / 1.5) ** 0.5 * (canvas_width_in / canvas_height_in) ** 0.3))
     rows = math.ceil(logo_count / cols)
-    padding_ratio = 0.9  # try 0.85 if still too tight
+
+    # Size of each cell in the grid
     cell_width = canvas_width_px / cols
     cell_height = canvas_height_px / rows
-    
-    # NEW: add spacing between cells
-    padding_px = 12  # try 12–24 pixels for better spacing
-    
-    # Adjust cell dimensions by subtracting padding
-    usable_cell_width = cell_width - padding_px
-    usable_cell_height = cell_height - padding_px
-    
+
+    # Padding space between logos (in pixels)
+    padding_px = 20
+
+    # Left/top margin to center the grid on the slide
     left_margin = Inches((10 - canvas_width_in) / 2)
     top_margin = Inches((7.5 - canvas_height_in) / 2)
+
     for idx, logo in enumerate(logos):
         col = idx % cols
         row = idx // cols
+
         trimmed = trim_whitespace(logo)
         img_w, img_h = trimmed.size
-        
-        # Limit to cell size without resizing unless absolutely necessary
-        scale = min(cell_width / img_w, cell_height / img_h, 1.0)  # Prevent upscaling
+
+        max_logo_width = cell_width - padding_px
+        max_logo_height = cell_height - padding_px
+
+        # Scale the logo to fit within the cell, respecting aspect ratio
+        scale = min(max_logo_width / img_w, max_logo_height / img_h, 1.0)
         final_w = img_w * scale
         final_h = img_h * scale
-        
+
         img_stream = io.BytesIO()
         trimmed.save(img_stream, format="PNG", dpi=(300, 300))
         img_stream.seek(0)
-        
+
         x_offset = (cell_width - final_w) / 2
         y_offset = (cell_height - final_h) / 2
+
         left = left_margin + Inches((col * cell_width + x_offset) / 96)
         top = top_margin + Inches((row * cell_height + y_offset) / 96)
-        
+
         slide.shapes.add_picture(
-            img_stream, left, top,
+            img_stream,
+            left,
+            top,
             width=Inches(final_w / 96),
             height=Inches(final_h / 96)
         )
-
 
 # --- Streamlit UI ---
 st.title("Logo Grid PowerPoint Exporter")
