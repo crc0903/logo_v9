@@ -34,8 +34,8 @@ def create_logo_slide(prs, logos, canvas_width_in, canvas_height_in, logos_per_r
     cols = logos_per_row if logos_per_row else max(1, round(math.sqrt(logo_count * canvas_width_in / canvas_height_in)))
     rows = math.ceil(logo_count / cols)
 
-    cell_width_in = canvas_width_in / cols
-    cell_height_in = canvas_height_in / rows
+    cell_width = canvas_width_px / cols
+    cell_height = canvas_height_px / rows
 
     left_margin = Inches((10 - canvas_width_in) / 2)
     top_margin = Inches((7.5 - canvas_height_in) / 2)
@@ -43,24 +43,15 @@ def create_logo_slide(prs, logos, canvas_width_in, canvas_height_in, logos_per_r
     for idx, logo in enumerate(logos):
         col = idx % cols
         row = idx // cols
-
-        resized = resize_to_fit(logo, cell_width_in * 96, cell_height_in * 96)
+        resized = resize_to_fit(logo, cell_width, cell_height)
 
         img_stream = io.BytesIO()
         resized.save(img_stream, format="PNG")
         img_stream.seek(0)
 
-        left = left_margin + Inches(col * cell_width_in)
-        top = top_margin + Inches(row * cell_height_in)
-
-        # Insert at full grid cell size
-        slide.shapes.add_picture(
-            img_stream,
-            left,
-            top,
-            width=Inches(cell_width_in),
-            height=Inches(cell_height_in)
-        )
+        left = left_margin + Inches(col * (canvas_width_in / cols))
+        top = top_margin + Inches(row * (canvas_height_in / rows))
+        slide.shapes.add_picture(img_stream, left, top, width=Inches(resized.width / 96), height=Inches(resized.height / 96))
 
 st.title("Logo Grid PowerPoint Exporter")
 st.markdown("Upload logos or use preloaded ones below:")
@@ -81,18 +72,11 @@ if st.button("Generate PowerPoint"):
             image = Image.open(f).convert("RGBA")
             images.append(image)
 
-    for name in sorted(selected_preloaded):
+    for name in selected_preloaded:
         images.append(preloaded[name])
 
     if not images:
         st.warning("Please upload or select logos.")
     else:
         prs = Presentation()
-        create_logo_slide(prs, images, canvas_width_in, canvas_height_in, logos_per_row if logos_per_row > 0 else None)
-
-        output = io.BytesIO()
-        prs.save(output)
-        output.seek(0)
-
-        st.success("PowerPoint created!")
-        st.download_button("Download .pptx", output, file_name="logo_grid.pptx")
+        create_logo_slide(prs, images, canvas_width_in
