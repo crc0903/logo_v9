@@ -25,7 +25,7 @@ def create_logo_slide(prs, logos, canvas_width_in, canvas_height_in, logos_per_r
     cols = logos_per_row if logos_per_row else max(1, round((logo_count / 1.5) ** 0.5 * (canvas_width_in / canvas_height_in) ** 0.3))
     rows = math.ceil(logo_count / cols)
 
-    h_spacing_ratio = 0.85  # tighter horizontal fill
+    h_spacing_ratio = 0.65  # tighter horizontal fill
     v_spacing_ratio = 0.92  # more generous vertical fill
 
     cell_width = (canvas_width_px / cols) * h_spacing_ratio
