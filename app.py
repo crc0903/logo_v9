@@ -53,8 +53,16 @@ def create_logo_slide(prs, logos, canvas_width_in, canvas_height_in, logos_per_r
     cols = logos_per_row if logos_per_row else max(1, round((logo_count / 1.5) ** 0.5 * (canvas_width_in / canvas_height_in) ** 0.3))
     rows = math.ceil(logo_count / cols)
     padding_ratio = 0.9  # try 0.85 if still too tight
-    cell_width = (canvas_width_px / cols) * padding_ratio
-    cell_height = (canvas_height_px / rows) * padding_ratio
+    cell_width = canvas_width_px / cols
+    cell_height = canvas_height_px / rows
+    
+    # NEW: add spacing between cells
+    padding_px = 12  # try 12–24 pixels for better spacing
+    
+    # Adjust cell dimensions by subtracting padding
+    usable_cell_width = cell_width - padding_px
+    usable_cell_height = cell_height - padding_px
+    
     left_margin = Inches((10 - canvas_width_in) / 2)
     top_margin = Inches((7.5 - canvas_height_in) / 2)
     for idx, logo in enumerate(logos):
