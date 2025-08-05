@@ -16,7 +16,7 @@ def trim_whitespace(image):
         return image.crop(bbox)
     return image
 
-def resize_to_fill_5x2_box(image, cell_width_px, cell_height_px, buffer_ratio=0.75):
+def resize_to_fill_5x2_box(image, cell_width_px, cell_height_px, buffer_ratio=0.7, logo_scale=0.85):
     box_ratio = 3 / 1
     max_box_width = int(cell_width_px * buffer_ratio)
     max_box_height = int(cell_height_px * buffer_ratio)
@@ -28,12 +28,11 @@ def resize_to_fill_5x2_box(image, cell_width_px, cell_height_px, buffer_ratio=0.
         box_height = max_box_height
         box_width = int(max_box_height * box_ratio)
 
+    box_width = int(box_width * logo_scale)
+    box_height = int(box_height * logo_scale)
+
     img_w, img_h = image.size
     img_ratio = img_w / img_h
-
-    if img_w <= box_width and img_h <= box_height:
-        # No need to resize if already fits
-        return image, img_w, img_h
 
     if img_ratio > (box_width / box_height):
         new_width = box_width
@@ -43,7 +42,7 @@ def resize_to_fill_5x2_box(image, cell_width_px, cell_height_px, buffer_ratio=0.
         new_width = int(box_height * img_ratio)
 
     resized = image.resize((new_width, new_height), Image.LANCZOS)
-    return resized, new_width, new_height
+    return resized
 
 def create_logo_slide(prs, logos, canvas_width_in, canvas_height_in, logos_per_row):
     slide = prs.slides.add_slide(prs.slide_layouts[6])
@@ -65,10 +64,11 @@ def create_logo_slide(prs, logos, canvas_width_in, canvas_height_in, logos_per_r
         row = idx // cols
 
         trimmed = trim_whitespace(logo)
-        resized, final_w, final_h = resize_to_fill_5x2_box(trimmed, cell_width, cell_height)
+        resized = resize_to_fill_5x2_box(trimmed, cell_width, cell_height)
 
-        x_offset = (cell_width - final_w) / 2
-        y_offset = (cell_height - final_h) / 2
+        img_w, img_h = resized.size
+        x_offset = (cell_width - img_w) / 2
+        y_offset = (cell_height - img_h) / 2
 
         left = left_margin + Inches((col * cell_width + x_offset) / 96)
         top = top_margin + Inches((row * cell_height + y_offset) / 96)
@@ -81,8 +81,8 @@ def create_logo_slide(prs, logos, canvas_width_in, canvas_height_in, logos_per_r
             img_stream,
             left,
             top,
-            width=Inches(final_w / 96),
-            height=Inches(final_h / 96)
+            width=Inches(img_w / 96),
+            height=Inches(img_h / 96)
         )
 
 # --- Streamlit UI ---
@@ -91,6 +91,7 @@ st.markdown("Upload logos or use preloaded ones below:")
 
 if not os.path.exists(PRELOADED_LOGO_DIR):
     os.makedirs(PRELOADED_LOGO_DIR)
+
 preloaded_filenames = sorted([
     os.path.splitext(f)[0] for f in os.listdir(PRELOADED_LOGO_DIR)
     if f.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))
