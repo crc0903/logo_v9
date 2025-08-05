@@ -16,24 +16,32 @@ def trim_whitespace(image):
         return image.crop(bbox)
     return image
 
-def resize_to_fill_5x2_box(image, cell_width_px, cell_height_px, buffer_ratio=0.8):
+def resize_to_fill_5x2_box(image, cell_width_px, cell_height_px, buffer_ratio=0.7, logo_scale=0.85):
     box_ratio = 3 / 1
     max_box_width = int(cell_width_px * buffer_ratio)
     max_box_height = int(cell_height_px * buffer_ratio)
+
     if max_box_width / box_ratio <= max_box_height:
         box_width = max_box_width
         box_height = int(max_box_width / box_ratio)
     else:
         box_height = max_box_height
         box_width = int(max_box_height * box_ratio)
+
+    # Shrink the box slightly to introduce spacing between logos
+    box_width = int(box_width * logo_scale)
+    box_height = int(box_height * logo_scale)
+
     img_w, img_h = image.size
     img_ratio = img_w / img_h
+
     if img_ratio > (box_width / box_height):
         new_width = box_width
         new_height = int(box_width / img_ratio)
     else:
         new_height = box_height
         new_width = int(box_height * img_ratio)
+
     resized = image.resize((new_width, new_height), Image.LANCZOS)
     return resized, box_width, box_height
 
